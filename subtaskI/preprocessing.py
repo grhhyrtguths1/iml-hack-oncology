@@ -147,7 +147,7 @@ def basic_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
             cols_to_drop.append(col)
 
     if cols_to_drop:
-        print("Dropping columns with >90% missing or unknown values:", cols_to_drop)
+        # print("Dropping columns with >90% missing or unknown values:", cols_to_drop)
         df.drop(columns=cols_to_drop, inplace=True)
 
     return df
