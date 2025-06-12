@@ -383,6 +383,7 @@ def bucket_histological_diagnosis(df):
     else:
         df['Histological diagnosis'] = 'Other/NOS'
 
+
     return df
 
 def label_encode_columns(df, columns):
