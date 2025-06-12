@@ -66,9 +66,9 @@ def preprocess_test(X: pd.DataFrame, train_columns: list):
     return X_processed
 
 if __name__ == '__main__':
-    train_feats = pd.read_csv('../data/train_test_splits/train.feats.csv')
-    train_labels = pd.read_csv('../data/train_test_splits/train.labels.0.csv')
-    test_feats = pd.read_csv('../data/train_test_splits/test.feats.csv')
+    train_feats = pd.read_csv('../train_test_splits/train.feats.csv')
+    train_labels = pd.read_csv('../train_test_splits/train.labels.0.csv')
+    test_feats = pd.read_csv('../train_test_splits/test.feats.csv')
 
     X_train, y_train = preprocess_train(train_feats, train_labels)
     X_test = preprocess_test(test_feats, X_train.columns)
