@@ -4,7 +4,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 
 # Load data
-train_features = pd.read_csv("../subtaskI/y_train_processed500.csv", low_memory=False)
+train_features = pd.read_csv("y_train_processed500.csv", low_memory=False)
 train_labels = pd.read_csv("../train_test_splits/train.labels.1.csv")
 test_features = pd.read_csv("../train_test_splits/test.feats.csv")
 

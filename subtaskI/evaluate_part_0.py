@@ -11,16 +11,12 @@ Options:
 """
 # External imports
 import logging
-import pdb
-from pprint import pprint
-from pprint import pformat
-import docopt
+
 from pathlib import Path
-from tqdm import tqdm
-import numpy as np
-import json
+
+from docopt import docopt
+
 import pandas as pd
-import sklearn
 import itertools
 import numpy as np
 from sklearn.metrics import f1_score
