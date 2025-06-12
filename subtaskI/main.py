@@ -1,6 +1,5 @@
 import pandas as pd
 from part1 import DataLoader, BaselineModel, XGBoostModel
-import evaluate_part_0
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 from docopt import docopt
@@ -51,7 +50,7 @@ if __name__ == "__main__":
     xgb_model = trainXGBModel(X, y)
     xgb_model.set_label_encoder(dataLoader.label_encoder)
 
-    predictWithModel(xgb_model, X_test, output_path="xgb_predictions.csv")
+    predictWithModel(xgb_model, X_test, output_path="predictions.csv")
     # s=xgb_model.evaluate(y_test, xgb_model.predict(X_test))
     # print(s)
 
