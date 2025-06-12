@@ -263,6 +263,7 @@ def drop_unneeded_columns(df):
     return df.drop(columns=[col for col in drop_cols if col in df.columns])
 
 
+
 surgery_translation_map = {
     'כיר-לאפ-הוצ טבעת/שנוי מי': 'Laparotomy - ring removal or gender reassignment',
     'כירו-שד-למפקטומי+בלוטות': 'Breast surgery - lumpectomy + lymph nodes',
