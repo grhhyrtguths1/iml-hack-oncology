@@ -14,7 +14,9 @@ def basic_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     # exit()
     # Convert date columns to datetime
     for col in ['Diagnosis date', 'Surgery date1', 'Surgery date2', 'Surgery date3', 'surgery before or after-Activity date']:
-        df[col] = pd.to_datetime(df[col], errors='coerce')
+        # Remove known bad values and extra time information
+        df[col] = df[col].astype(str).str.slice(0, 10)  # keep only the date part
+        df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce')  # parse date
 
     # Calculate date differences in days
     df['days_to_surgery1'] = (df['Surgery date1'] - df['Diagnosis date']).dt.days
@@ -28,6 +30,7 @@ def basic_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     # Numerical columns - fill missing values with median
     num_cols = ['Tumor width', 'Tumor depth', 'Positive nodes', 'Nodes exam', 'KI67 protein',
                 'days_to_surgery1', 'days_to_surgery2', 'days_to_surgery3', 'days_to_activity']
+
     for col in num_cols:
         df[col] = df[col].astype(str).str.replace('%', '', regex=False)
         df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -39,7 +42,7 @@ def basic_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
                 'T -Tumor mark (TNM)', 'er', 'pr',
                 'Stage', 'Side', 'Surgery name1', 'Surgery name2', 'Surgery name3', 'age_group']
     for col in cat_cols:
-        if pd.api.types.is_categorical_dtype(df[col]):
+        if isinstance(df[col].dtype, pd.CategoricalDtype):
             if 'unknown' not in df[col].cat.categories:
                 df[col] = df[col].cat.add_categories(['unknown'])
         df[col] = df[col].fillna('unknown')
@@ -66,9 +69,17 @@ def preprocess_test(X: pd.DataFrame, train_columns: list):
     return X_processed
 
 if __name__ == '__main__':
-    train_feats = pd.read_csv('../train_test_splits/train.feats.csv')
+    dtype_override = {
+        'אבחנה-Ivi -Lymphovascular invasion': 'str',
+        'אבחנה-Surgery date2': 'str',
+        'אבחנה-Surgery date3': 'str',
+        'אבחנה-Surgery name2': 'str',
+        'אבחנה-Surgery name3': 'str'
+    }
+
+    train_feats = pd.read_csv('../train_test_splits/train.feats.csv', dtype=dtype_override)
+    test_feats = pd.read_csv('../train_test_splits/test.feats.csv', dtype=dtype_override)
     train_labels = pd.read_csv('../train_test_splits/train.labels.0.csv')
-    test_feats = pd.read_csv('../train_test_splits/test.feats.csv')
 
     X_train, y_train = preprocess_train(train_feats, train_labels)
     X_test = preprocess_test(test_feats, X_train.columns)
