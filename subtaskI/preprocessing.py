@@ -43,9 +43,85 @@ def normalize_er_pr(value):
 
     return 'unknown'
 
+def clean_her2_text(val):
+    import re
+    if pd.isna(val):
+        return ""
+    val = str(val).lower()
+    val = val.strip()
+    val = re.sub(r'[\"\',()\[\]%]', '', val)
+    val = val.replace('חיובי', 'positive')
+    val = val.replace('שלילי', 'negative')
+    val = val.replace('לא', 'not')
+    val = val.replace('נבדק', '')
+    val = val.replace('נבדקה', '')
+    val = val.replace('nd', '')
+    val = re.sub(r'\s+', ' ', val)
+    return val
+
+def extract_ihc(val):
+    if re.search(r'3\+|\+3|pos\s*\+3', val):
+        return "3+"
+    elif re.search(r'2\+|\+2', val):
+        return "2+"
+    elif re.search(r'1\+|\+1', val):
+        return "1+"
+    elif re.search(r'\b0\b|negative|neg\b|0-1|--|-', val):
+        return "0"
+    else:
+        return "uncertain"
+
+
+def extract_fish(val):
+    if "fish" not in val:
+        return "not_tested"
+
+    if re.search(r'amplified|fish\+|positive|pos\b|amp\b', val):
+        return "positive"
+    elif re.search(
+            r'notamplified|nonamplified|negative|fish-|fish\s*-|noamplificated|not amplified|fish neg|fish negative',
+            val):
+        return "negative"
+    elif re.search(r'equivocal|borderline|pending|indeterminate|intermediate|indet', val):
+        return "equivocal"
+    else:
+        return "uncertain"
+
+
+def classify_final(row):
+    ihc = row["ihc_score"]
+    fish = row["fish_result"]
+
+    if ihc == "3+":
+        return "positive"
+    if ihc == "2+":
+        if fish == "positive":
+            return "positive"
+        elif fish == "negative":
+            return "negative"
+        elif fish == "equivocal":
+            return "equivocal"
+        else:
+            return "uncertain"
+    if ihc in ["1+", "0"]:
+        return "negative"
+    return "uncertain"
+
+def normalize_her2(df):
+    df["her2_clean"] = df["Her2"].apply(clean_her2_text)
+    df["ihc_score"] = df["her2_clean"].apply(extract_ihc)
+    df["fish_result"] = df["her2_clean"].apply(extract_fish)
+    df["her2_final"] = df.apply(classify_final, axis=1)
+    return df
+
 def clean_and_normalize_features(df):
     df['er'] = df['er'].apply(normalize_er_pr)
     df['pr'] = df['pr'].apply(normalize_er_pr)
+
+    if 'Her2' in df.columns:
+        df = normalize_her2(df)
+
+
     df['Age'] = pd.to_numeric(df['Age'], errors='coerce').round().astype('Int64')
     df['Basic stage'] = df['Basic stage'].astype(str).str.lower().str.extract(r'\b(c|p|r)\b', expand=False)
 
