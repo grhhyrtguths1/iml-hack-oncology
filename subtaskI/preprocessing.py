@@ -167,10 +167,6 @@ def clean_and_normalize_features(df):
     df['Age'] = pd.to_numeric(df['Age'], errors='coerce').round().astype('Int64')
     df['Basic stage'] = df['Basic stage'].astype(str).str.lower().str.extract(r'\b(c|p|r)\b', expand=False)
 
-    # valid_grades = ['G1', 'G2', 'G3', 'G4', 'GX']
-    # df['Histopatological degree'] = df['Histopatological degree'].str.upper().where(
-    #     df['Histopatological degree'].str.upper().isin(valid_grades), 'Null')
-
     df['Ivi -Lymphovascular invasion'] = df['Ivi -Lymphovascular invasion'].str.lower().replace({
         '+': 'positive', '(+)': 'positive', 'pos': 'positive', 'yes': 'positive',
         '-': 'negative', '(-)': 'negative', 'neg': 'negative', 'no': 'negative', 'none': 'negative', 'not': 'negative',
@@ -191,6 +187,8 @@ def clean_and_normalize_features(df):
     if 'KI67 protein' in df.columns:
         df['KI67_clean'] = df['KI67 protein'].apply(parse_ki67)
         df['KI67_category'] = df['KI67_clean'].apply(categorize_ki67)
+
+    df["Positive nodes ratio"] = df["Positive nodes"] / df["Nodes exam"]
 
     return df
 
@@ -223,6 +221,7 @@ def process_dates_and_durations(df):
     df['days_to_surgery2'] = (df['Surgery date2'] - df['Diagnosis date']).dt.days
     df['days_to_surgery3'] = (df['Surgery date3'] - df['Diagnosis date']).dt.days
     df['days_to_activity'] = (df['surgery before or after-Activity date'] - df['Diagnosis date']).dt.days
+
     return df
 
 def process_age_binning(df):
@@ -242,7 +241,7 @@ def process_numerical_columns(df):
 
 def process_categorical_columns(df):
     cat_cols = ['Her2', 'Histological diagnosis', 'Histopatological degree',
-                'Ivi -Lymphovascular invasion', 'Lymphatic penetration',
+                'Ivi -Lymphovascular invasion',
                 'M -metastases mark (TNM)', 'Margin Type', 'N -lymph nodes mark (TNM)',
                 'T -Tumor mark (TNM)', 'er', 'pr',
                 'Stage', 'Side', 'Surgery name1', 'Surgery name2', 'Surgery name3', 'age_group']
@@ -257,9 +256,8 @@ def process_categorical_columns(df):
     return df
 
 def drop_unneeded_columns(df):
-    drop_cols = ['Form Name', 'Hospital', 'User Name', 'id-hushed_internalpatientid',
-                 'Diagnosis date', 'Surgery date1', 'Surgery date2', 'Surgery date3', 'surgery before or after-Activity date',
-                 'age_group','KI67_category','her2_final','Side','Lymphatic penetration','Histological diagnosis']
+    drop_cols = ['Form Name', 'Hospital', 'User Name', 'id-hushed_internalpatientid', 'Positive nodes', 'Nodes exam',
+                 'Diagnosis date', 'Surgery date1', 'Surgery date2', 'Surgery date3', 'surgery before or after-Activity date']
     return df.drop(columns=[col for col in drop_cols if col in df.columns])
 
 
