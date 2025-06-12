@@ -50,9 +50,9 @@ class BaselineModel:
         Y_pred = self.model.predict(X)
         return Y_pred
 
-    def decodeData(self, Y_pred):
-        decoded = [self.label_encoder.decode(row) for row in Y_pred]
-        return np.array(decoded)
+    def decode(self, multi_hot_vector):
+        indices = np.where(multi_hot_vector == 1)[0]
+        return [self.ind_to_label[i] for i in indices if i in self.ind_to_label]
 
     def save_predictions(self, Y_pred, out_path="baseline_submission.csv"):
         decoded = [self.label_encoder.decode(row) for row in Y_pred]
@@ -70,7 +70,7 @@ class XGBoostModel:
         from xgboost import XGBClassifier
         from sklearn.multioutput import MultiOutputClassifier
         self.label_encoder = Encode_Multi_Hot()
-        self.base_model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+        self.base_model = XGBClassifier(eval_metric='logloss')
         self.model = MultiOutputClassifier(self.base_model)
 
     def set_label_encoder(self, encoder):
