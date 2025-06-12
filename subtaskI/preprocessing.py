@@ -125,17 +125,17 @@ def clean_and_normalize_features(df):
     df['Age'] = pd.to_numeric(df['Age'], errors='coerce').round().astype('Int64')
     df['Basic stage'] = df['Basic stage'].astype(str).str.lower().str.extract(r'\b(c|p|r)\b', expand=False)
 
-    valid_grades = ['G1', 'G2', 'G3', 'G4', 'GX']
-    df['Histopatological degree'] = df['Histopatological degree'].str.upper().where(
-        df['Histopatological degree'].str.upper().isin(valid_grades), 'Null')
+    # valid_grades = ['G1', 'G2', 'G3', 'G4', 'GX']
+    # df['Histopatological degree'] = df['Histopatological degree'].str.upper().where(
+    #     df['Histopatological degree'].str.upper().isin(valid_grades), 'Null')
 
     df['Ivi -Lymphovascular invasion'] = df['Ivi -Lymphovascular invasion'].str.lower().replace({
         '+': 'positive', '(+)': 'positive', 'pos': 'positive', 'yes': 'positive',
         '-': 'negative', '(-)': 'negative', 'neg': 'negative', 'no': 'negative', 'none': 'negative', 'not': 'negative',
     })
 
-    df['Lymphatic penetration'] = df['Lymphatic penetration'].str.upper().where(
-        df['Lymphatic penetration'].str.match(r'^L\d+$'), 'Null')
+    # df['Lymphatic penetration'] = df['Lymphatic penetration'].str.upper().where(
+    #     df['Lymphatic penetration'].str.match(r'^L\d+$'), 'Null')
 
     df['M -metastases mark (TNM)'] = df['M -metastases mark (TNM)'].str.upper().where(
         df['M -metastases mark (TNM)'].str.match(r'^M\d+$'), 'Null')
