@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 import re
+from sklearn.preprocessing import LabelEncoder
+
+
 
 
 def remove_abchana_prefix(df):
@@ -112,7 +115,46 @@ def normalize_her2(df):
     df["ihc_score"] = df["her2_clean"].apply(extract_ihc)
     df["fish_result"] = df["her2_clean"].apply(extract_fish)
     df["her2_final"] = df.apply(classify_final, axis=1)
+    df = df.drop(columns=["Her2", "her2_clean", "ihc_score", "fish_result"])
     return df
+
+
+def parse_ki67(val):
+    if pd.isnull(val):
+        return np.nan
+
+    val = str(val).strip().lower()
+    val = re.sub(r'[^\d<>\-%\.]', '', val)
+    match = re.search(r'(\d{1,3})(?:\.?\d*)', val)
+    if match:
+        num = float(match.group(1))
+        if num > 100 and num < 1000:
+            num = num / 10
+        elif num >= 1000:
+            num = num / 100
+        return num
+
+    if 'low' in val:
+        return 5
+    elif 'inter' in val:
+        return 15
+    elif 'high' in val:
+        return 30
+
+    return np.nan
+
+
+def categorize_ki67(value):
+    if pd.isnull(value):
+        return 'unknown'
+    elif value < 10:
+        return 'low'
+    elif value < 20:
+        return 'intermediate'
+    else:
+        return 'high'
+
+
 
 def clean_and_normalize_features(df):
     df['er'] = df['er'].apply(normalize_er_pr)
@@ -145,6 +187,11 @@ def clean_and_normalize_features(df):
         df['T -Tumor mark (TNM)'].str.match(r'^T\d+[a-zA-Z]*$'), 'Null')
 
     df['Stage'] = df['Stage'].str.replace(r'^Stage', '', regex=True)
+
+    if 'KI67 protein' in df.columns:
+        df['KI67_clean'] = df['KI67 protein'].apply(parse_ki67)
+        df['KI67_category'] = df['KI67_clean'].apply(categorize_ki67)
+
     return df
 
 def drop_mostly_missing_or_unknown_columns(df, threshold=0.9):
@@ -211,12 +258,143 @@ def process_categorical_columns(df):
 
 def drop_unneeded_columns(df):
     drop_cols = ['Form Name', 'Hospital', 'User Name', 'id-hushed_internalpatientid',
-                 'Diagnosis date', 'Surgery date1', 'Surgery date2', 'Surgery date3', 'surgery before or after-Activity date']
+                 'Diagnosis date', 'Surgery date1', 'Surgery date2', 'Surgery date3', 'surgery before or after-Activity date',
+                 'age_group','KI67_category','her2_final','Side','Lymphatic penetration','Histological diagnosis']
     return df.drop(columns=[col for col in drop_cols if col in df.columns])
 
+
+surgery_translation_map = {
+    'כיר-לאפ-הוצ טבעת/שנוי מי': 'Laparotomy - ring removal or gender reassignment',
+    'כירו-שד-למפקטומי+בלוטות': 'Breast surgery - lumpectomy + lymph nodes',
+    'כירו-שד-מסטקטומי+בלוטות': 'Breast surgery - mastectomy + lymph nodes',
+    'כירורגיה-שד למפקטומי': 'Breast surgery - lumpectomy',
+    'שד-כריתה בגישה זעירה+בלוטות': 'Minimally invasive breast removal + lymph nodes',
+    'כירו-שד-למפקטומי+בלוטות+קרינה תוך ניתוחית (intrabeam)': 'Lumpectomy + lymph nodes + intraoperative radiation (intrabeam)',
+    'שד-כריתה בגישה זעירה דרך העטרה': 'Minimally invasive breast removal via areola',
+    'כירור-הוצאת בלוטות לימפה': 'Lymph node removal surgery',
+    'כיר-שד-הוצ.בלוטות בית שח': 'Breast surgery - axillary lymph node removal',
+    'כירורגיה-שד מסטקטומי': 'Breast surgery - mastectomy',
+    np.nan: 'unknown'
+}
+
+side_translation_map = {
+    'שמאל': 'left',
+    'ימין': 'right',
+    'דו צדדי': 'bilateral',
+    'unknown': 'unknown'
+}
+
+margin_translation_map = {
+    'נקיים': 'clear',
+    'ללא': 'none',
+    'נגועים': 'involved',
+    'unknown': 'unknown'
+}
+
+
+def translate_columns(df):
+    # עמודות ניתוח
+    surgery_columns = ['Surgery name1', 'Surgery name2', 'Surgery name3', 'surgery before or after-Actual activity']
+    for col in surgery_columns:
+        if col in df.columns:
+            df[col] = df[col].map(surgery_translation_map).fillna('unknown')
+
+    # עמודת צד
+    if 'Side' in df.columns:
+        df['Side'] = df['Side'].map(side_translation_map).fillna('unknown')
+
+    # עמודת שולי ניתוח
+    if 'Margin Type' in df.columns:
+        df['Margin Type'] = df['Margin Type'].map(margin_translation_map).fillna('unknown')
+
+    return df
+
+def bucket_histological_diagnosis(df):
+    def histology_bucket(hist):
+        if pd.isna(hist):
+            return 'Other/NOS'
+        hist = hist.upper().strip()
+
+        malignant_invasive = [
+            'INFILTRATING DUCT CARCINOMA',
+            'LOBULAR INFILTRATING CARCINOMA',
+            'INFILTRATING DUCTULAR CARCINOMA WITH DCIS',
+            'DUCTAL AND LOBULAR CARCINOMA',
+            'NEUROENDOCRINE CARCINOMA',
+            'INFLAMMATORY CARCINOMA',
+            'MEDULLARY CARCINOMA',
+            'MUCINOUS ADENOCARCINOMA',
+            'APOCRINE ADENOCARCINOMA',
+            'MUCIN PRODUCING ADENOCARCINOMA',
+            'PAGET`S AND INTRADUCTAL CARCINOMA OF BREAST',
+            'INTRACYSTIC CARCINOMA',
+            'ADENOCARCINOMA',
+            'PAPILLARY ADENOCARCINOMA',
+            'TUBULAR CARCINOMA',
+            'PHYLLODES TUMOR MALIGNANT',
+            'COMEDOCARCINOMA',
+            'INTRADUCTAL PAP CARCINOMA WITH INVASION'
+        ]
+
+        in_situ = [
+            'DUCTAL CARCINOMA IN SITU',
+            'LOBULAR CARCINOMA IN SITU',
+            'COMEDOCARCINOMA IN SITU',
+            'INTRADUCTAL CARCINOMA',
+            'INTRADUCT AND LOBULAR CARCINOMA IN SITU'
+        ]
+
+        benign = [
+            'BENIGN TUMOR, NOS',
+            'FIBROADENOMA, NOS',
+            'ADENOMA OF NIPPLE',
+            'PHYLLODES TUMOR BENIGN',
+            'INTRADUCTAL PAPILLOMA',
+            'INTRACYSTIC PAP ADENOMA',
+            'INTRADUCTAL PAPILLOMATOSIS, NOS'
+        ]
+
+        other_or_nos = [
+            'CARCINOMA, NOS',
+            'TUMOR  MALIGNANT, NOS',
+            'PAGET`S DISEASE OF BREAST',
+            'VERRUCOUS CARCINOMA, VERRUCOUS SQUAMOUS CELL CARC',
+            'PHYLLODES TUMOR NOS',
+            'INTRADUCTAL PAPILLARY CARCINOMA',
+            'ADENOID CYSTIC CA,ADENOCYSTIC CA',
+            'PAPILLARY CARCINOMA'
+        ]
+
+        if hist in malignant_invasive:
+            return 'Malignant Invasive'
+        elif hist in in_situ:
+            return 'Carcinoma In Situ'
+        elif hist in benign:
+            return 'Benign/Borderline'
+        elif hist in other_or_nos:
+            return 'Other/NOS'
+        else:
+            return 'Other/NOS'
+
+    if 'Histological diagnosis' in df.columns:
+        df['Histological diagnosis'] = df['Histological diagnosis'].apply(histology_bucket)
+    else:
+        df['Histological diagnosis'] = 'Other/NOS'
+
+    return df
+
+def label_encode_columns(df, columns):
+    df = df.copy()
+    for col in columns:
+        if col in df.columns:
+            le = LabelEncoder()
+            df[col] = le.fit_transform(df[col].astype(str))
+    return df
 def basic_feature_engineering(df):
     df = remove_abchana_prefix(df)
+    df = translate_columns(df)
     df = clean_and_normalize_features(df)
+    df = bucket_histological_diagnosis(df)
     df = process_tumor_size(df)
     df = process_dates_and_durations(df)
     df = drop_mostly_missing_or_unknown_columns(df)
@@ -224,6 +402,12 @@ def basic_feature_engineering(df):
     df = process_numerical_columns(df)
     df = process_categorical_columns(df)
     df = drop_unneeded_columns(df)
+    label_cols = [
+        'Histopatological degree', 'M -metastases mark (TNM)', 'Margin Type',
+        'Basic stage', 'N -lymph nodes mark (TNM)', 'T -Tumor mark (TNM)',
+        'Stage', 'er', 'pr', 'surgery before or after-Actual activity'
+    ]
+    df = label_encode_columns(df, label_cols)
     return df
 
 def preprocess_train(X: pd.DataFrame, y: pd.DataFrame):
