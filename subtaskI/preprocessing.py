@@ -264,6 +264,7 @@ def drop_unneeded_columns(df):
 
 
 
+
 surgery_translation_map = {
     'כיר-לאפ-הוצ טבעת/שנוי מי': 'Laparotomy - ring removal or gender reassignment',
     'כירו-שד-למפקטומי+בלוטות': 'Breast surgery - lumpectomy + lymph nodes',
