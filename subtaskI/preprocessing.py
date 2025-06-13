@@ -96,19 +96,19 @@ def classify_final(row):
     fish = row["fish_result"]
 
     if ihc == "3+":
-        return "positive"
+        return "1"
     if ihc == "2+":
         if fish == "positive":
-            return "positive"
+            return "1"
         elif fish == "negative":
-            return "negative"
+            return "0"
         elif fish == "equivocal":
-            return "equivocal"
+            return "3"
         else:
-            return "uncertain"
+            return "2"
     if ihc in ["1+", "0"]:
-        return "negative"
-    return "uncertain"
+        return "0"
+    return "2"
 
 def normalize_her2(df):
     df["her2_clean"] = df["Her2"].apply(clean_her2_text)
@@ -185,10 +185,10 @@ def clean_and_normalize_features(df):
     df['Stage'] = df['Stage'].str.replace(r'^Stage', '', regex=True)
 
     if 'KI67 protein' in df.columns:
-        df['KI67_clean'] = df['KI67 protein'].apply(parse_ki67)
-        df['KI67_category'] = df['KI67_clean'].apply(categorize_ki67)
+        df['KI67'] = df['KI67 protein'].apply(parse_ki67)
+        df = df.drop(columns=['KI67 protein'])
 
-    df["Positive nodes ratio"] = df["Positive nodes"] / df["Nodes exam"]
+    df["Positive nodes ratio"] = (df["Positive nodes"] / df["Nodes exam"]).round(2)
 
     return df
 
@@ -197,13 +197,22 @@ def drop_mostly_missing_or_unknown_columns(df, threshold=0.9):
     for col in df.columns:
         total = len(df)
         missing_or_unknown = df[col].isna().sum()
+
         if df[col].dtype == object:
-            missing_or_unknown += (df[col].astype(str).str.lower() == 'unknown').sum()
+            col_lower = df[col].astype(str).str.lower()
+            missing_or_unknown += (
+                (col_lower == 'unknown') |
+                (col_lower == 'null') |
+                (col_lower == 'nan') |
+                (col_lower == '')
+            ).sum()
+
         if missing_or_unknown / total > threshold:
             cols_to_drop.append(col)
+
     if cols_to_drop:
-        # print("Dropping columns with >90% missing or unknown values:", cols_to_drop)
         df = df.drop(columns=cols_to_drop)
+
     return df
 
 def process_tumor_size(df):
@@ -225,7 +234,7 @@ def process_dates_and_durations(df):
     return df
 
 def process_age_binning(df):
-    df['age_group'] = pd.cut(df['Age'], bins=[0, 40, 60, 80, 120], labels=['young', 'mid', 'old', 'very_old'])
+    df['age_group'] = pd.cut(df['Age'], bins=[0, 40, 60, 80, 120], labels=['0', '1', '2', '3'])
     return df
 
 def process_numerical_columns(df):
@@ -244,7 +253,7 @@ def process_categorical_columns(df):
                 'Ivi -Lymphovascular invasion',
                 'M -metastases mark (TNM)', 'Margin Type', 'N -lymph nodes mark (TNM)',
                 'T -Tumor mark (TNM)', 'er', 'pr',
-                'Stage', 'Side', 'Surgery name1', 'Surgery name2', 'Surgery name3', 'age_group']
+                'Stage', 'Surgery name1', 'Surgery name2', 'Surgery name3', 'age_group']
 
     for col in cat_cols:
         if col in df.columns:
@@ -256,7 +265,7 @@ def process_categorical_columns(df):
     return df
 
 def drop_unneeded_columns(df):
-    drop_cols = ['Form Name', 'Hospital', 'User Name', 'id-hushed_internalpatientid', 'Positive nodes', 'Nodes exam',
+    drop_cols = ['Form Name', 'Hospital', 'User Name', 'id-hushed_internalpatientid', 'Positive nodes', 'Nodes exam', 'Side',
                  'Diagnosis date', 'Surgery date1', 'Surgery date2', 'Surgery date3', 'surgery before or after-Activity date']
     return df.drop(columns=[col for col in drop_cols if col in df.columns])
 
@@ -277,12 +286,6 @@ surgery_translation_map = {
     np.nan: 'unknown'
 }
 
-side_translation_map = {
-    'שמאל': 'left',
-    'ימין': 'right',
-    'דו צדדי': 'bilateral',
-    'unknown': 'unknown'
-}
 
 margin_translation_map = {
     'נקיים': 'clear',
@@ -293,17 +296,12 @@ margin_translation_map = {
 
 
 def translate_columns(df):
-    # עמודות ניתוח
     surgery_columns = ['Surgery name1', 'Surgery name2', 'Surgery name3', 'surgery before or after-Actual activity']
     for col in surgery_columns:
         if col in df.columns:
             df[col] = df[col].map(surgery_translation_map).fillna('unknown')
 
-    # עמודת צד
-    if 'Side' in df.columns:
-        df['Side'] = df['Side'].map(side_translation_map).fillna('unknown')
 
-    # עמודת שולי ניתוח
     if 'Margin Type' in df.columns:
         df['Margin Type'] = df['Margin Type'].map(margin_translation_map).fillna('unknown')
 
@@ -366,20 +364,20 @@ def bucket_histological_diagnosis(df):
         ]
 
         if hist in malignant_invasive:
-            return 'Malignant Invasive'
+            return "1"
         elif hist in in_situ:
-            return 'Carcinoma In Situ'
+            return "2"
         elif hist in benign:
-            return 'Benign/Borderline'
+            return "3"
         elif hist in other_or_nos:
-            return 'Other/NOS'
+            return "4"
         else:
-            return 'Other/NOS'
+            return "4"
 
     if 'Histological diagnosis' in df.columns:
         df['Histological diagnosis'] = df['Histological diagnosis'].apply(histology_bucket)
     else:
-        df['Histological diagnosis'] = 'Other/NOS'
+        df['Histological diagnosis'] = "4"
 
 
     return df
@@ -409,6 +407,15 @@ def basic_feature_engineering(df):
         'Stage', 'er', 'pr', 'surgery before or after-Actual activity'
     ]
     df = label_encode_columns(df, label_cols)
+
+    for col in df.columns:
+        if pd.api.types.is_categorical_dtype(df[col]):
+            if "-1" not in df[col].cat.categories:
+                df[col] = df[col].cat.add_categories("-1")
+            df[col] = df[col].fillna("-1")
+        else:
+            df[col] = df[col].fillna("-1")
+
     return df
 
 def preprocess_train(X: pd.DataFrame, y: pd.DataFrame):
@@ -439,7 +446,6 @@ if __name__ == '__main__':
 
     X_train, y_train = preprocess_train(train_feats, train_labels)
     X_test = preprocess_test(test_feats, X_train.columns)
-
     X_train.to_csv("X_train_processed.csv", index=False)
     X_test.to_csv("X_test_processed.csv", index=False)
     y_train.to_csv("y_train_processed.csv", index=False)
